@@ -31,13 +31,10 @@ const ChatRoom = () => {
             password: userData.password
         };
         stompClient.subscribe('/user/'+ userData.username + '/client/registerOrLogin', onRegisterOrLogin);
+        stompClient.subscribe('/user/'+ userData.username + '/client/userList', onUserList);
+        stompClient.send('/app/userList',{},JSON.stringify(user));
         stompClient.send('/app/registerOrLogin',{},JSON.stringify(user));
         console.log("forregister onconnect içi = " + forRegisterOrLogin);
-        
-       
-        //stompClient.send('/app/kekw',{},"null");
-        
-        
     }
     const userJoin = () => {
         var chatMessage = {
@@ -49,7 +46,7 @@ const ChatRoom = () => {
 
     const onRegisterOrLogin = (payload) => {
         var payloadData= JSON.parse(payload.body);
-        if(payloadData.message == "true"){
+        if(payloadData.message === "true"){
             forRegisterOrLogin = true
             console.log("forregister = " + forRegisterOrLogin);
         }else{
@@ -64,6 +61,11 @@ const ChatRoom = () => {
         }else{
             console.log("olmadı")
         }
+    }
+
+    const onUserList = (payload) => {
+        var payloadData = JSON.parse(payload.body);
+        console.log(payloadData);
     }
 
     const onMessageReceived = (payload) => {
@@ -198,7 +200,8 @@ const ChatRoom = () => {
                 :
                 <div className="register">
                     <form>
-                        <div>
+                        
+                        <div className="registerInput">
                             <input
                                 type="text"
                                 id="user-name"
@@ -209,7 +212,7 @@ const ChatRoom = () => {
                                 margin="normal"
                             />
                         </div>
-                        <div>
+                        <div className="registerInput">
                             <input
                                 type="password"
                                 id="password"
@@ -220,12 +223,11 @@ const ChatRoom = () => {
                                 margin="normal"
                             />
                         </div>
-                        <div>
+                        <div className="registerInput">
                             <button type="button" onClick={registerUser}>
                                 connect
                             </button>
                         </div>
-
                     </form>
                 </div>}
         </div>
