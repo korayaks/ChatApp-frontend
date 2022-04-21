@@ -4,6 +4,7 @@ import SockJS from 'sockjs-client';
 
 var stompClient = null;
 var forRegisterOrLogin;
+var usernames;
 const ChatRoom = () => {
     const [privateChats, setPrivateChats] = useState(new Map());
     const [publicChats, setPublicChats] = useState([]);
@@ -65,7 +66,12 @@ const ChatRoom = () => {
 
     const onUserList = (payload) => {
         var payloadData = JSON.parse(payload.body);
-        console.log(payloadData);
+        console.log(payload.body);
+        console.log(payloadData)
+        usernames = (payloadData).map(function(item){
+            return item.username;
+        });
+        console.log(usernames);
     }
 
     const onMessageReceived = (payload) => {
