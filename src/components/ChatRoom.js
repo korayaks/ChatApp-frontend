@@ -5,6 +5,7 @@ import SockJS from 'sockjs-client';
 var stompClient = null;
 var forRegisterOrLogin;
 var usernames;
+var onlineUsernames = [];
 const ChatRoom = () => {
     const [privateChats, setPrivateChats] = useState(new Map());
     const [publicChats, setPublicChats] = useState([]);
@@ -42,6 +43,7 @@ const ChatRoom = () => {
             senderName: userData.username,
             status: "JOIN"
         };
+        
         stompClient.send("/app/message", {}, JSON.stringify(chatMessage));
     }
 
@@ -69,15 +71,21 @@ const ChatRoom = () => {
         console.log(payload.body);
         console.log(payloadData)
         usernames = (payloadData).map(function(item){
+            privateChats.set(item.username, []);
             return item.username;
         });
+        
         console.log(usernames);
+        console.log("setted");
+        
     }
 
     const onMessageReceived = (payload) => {
         var payloadData = JSON.parse(payload.body);
         switch (payloadData.status) {
             case "JOIN":
+                onlineUsernames.push(payloadData.senderName);
+                console.log("ASDASDSDASD "+ onlineUsernames);
                 if (!privateChats.get(payloadData.senderName)) {
                     privateChats.set(payloadData.senderName, []);
                     setPrivateChats(new Map(privateChats));
