@@ -15,7 +15,7 @@ const ChatRoom = () => {
         password: '',
         receivername: '',
         connected: false,
-        message: ''
+        message: '',
     });
     useEffect(() => {
         console.log(userData);
@@ -32,10 +32,11 @@ const ChatRoom = () => {
             username: userData.username,
             password: userData.password
         };
-        stompClient.subscribe('/user/'+ userData.username + '/client/registerOrLogin', onRegisterOrLogin);
-        stompClient.subscribe('/user/'+ userData.username + '/client/userList', onUserList);
-        stompClient.send('/app/userList',{},JSON.stringify(user));
-        stompClient.send('/app/registerOrLogin',{},JSON.stringify(user));
+        stompClient.subscribe('/user/' + userData.username + '/client/registerOrLogin', onRegisterOrLogin);
+        stompClient.subscribe('/user/' + userData.username + '/client/userList', onUserList);
+        stompClient.subscribe('/user/' + userData.username + '/client/introduce', onIntroduce);
+        stompClient.send('/app/userList', {}, JSON.stringify(user));
+        stompClient.send('/app/registerOrLogin', {}, JSON.stringify(user));
         console.log("forregister onconnect içi = " + forRegisterOrLogin);
     }
     const userJoin = () => {
@@ -43,25 +44,31 @@ const ChatRoom = () => {
             senderName: userData.username,
             status: "JOIN"
         };
-        
+
         stompClient.send("/app/message", {}, JSON.stringify(chatMessage));
     }
+    const onIntroduce = (payload) => {
+        var payloadData = JSON.parse(payload.body);
+        onlineUsernames = payloadData.message;
+        console.log("LAST " + onlineUsernames);
 
+
+    }
     const onRegisterOrLogin = (payload) => {
-        var payloadData= JSON.parse(payload.body);
-        if(payloadData.message === "true"){
+        var payloadData = JSON.parse(payload.body);
+        if (payloadData.message === "true") {
             forRegisterOrLogin = true
             console.log("forregister = " + forRegisterOrLogin);
-        }else{
+        } else {
             forRegisterOrLogin = false;
         }
-        
-        if(forRegisterOrLogin){
+
+        if (forRegisterOrLogin) {
             setUserData({ ...userData, "connected": true });
             stompClient.subscribe('/chatroom/public', onMessageReceived);
             stompClient.subscribe('/user/' + userData.username + '/private', onPrivateMessage);
             userJoin();
-        }else{
+        } else {
             console.log("olmadı")
         }
     }
@@ -70,22 +77,31 @@ const ChatRoom = () => {
         var payloadData = JSON.parse(payload.body);
         console.log(payload.body);
         console.log(payloadData)
-        usernames = (payloadData).map(function(item){
-            privateChats.set(item.username, []);
+        usernames = (payloadData).map(function (item) {
+            if (item.username !== userData.username) {
+                privateChats.set(item.username, []);
+            }
+
             return item.username;
         });
-        
         console.log(usernames);
         console.log("setted");
-        
+
     }
 
     const onMessageReceived = (payload) => {
         var payloadData = JSON.parse(payload.body);
+        var chatMessage = {
+            senderName: userData.username,
+            receiverName: payloadData.senderName,
+            message: onlineUsernames,
+        };
+        console.log("receiver name = " + payloadData.senderName);
         switch (payloadData.status) {
             case "JOIN":
                 onlineUsernames.push(payloadData.senderName);
-                console.log("ASDASDSDASD "+ onlineUsernames);
+                console.log("ASDASDSDASD " + onlineUsernames);
+                stompClient.send('/app/introduce', {}, JSON.stringify(chatMessage));
                 if (!privateChats.get(payloadData.senderName)) {
                     privateChats.set(payloadData.senderName, []);
                     setPrivateChats(new Map(privateChats));
@@ -134,15 +150,42 @@ const ChatRoom = () => {
         }
     }
 
+    const exit = () => {
+        var chatMessage = {
+            senderName: userData.username,
+            receiverName: "",
+            message: onlineUsernames,
+        };
+
+        const index = onlineUsernames.indexOf(userData.username);
+        if (index > -1) {
+            onlineUsernames.splice(index, 1);
+        }
+        console.log("index dışı usernames = " + onlineUsernames);
+        chatMessage.message = onlineUsernames;
+        for (var i = 0; i < onlineUsernames.length; i++) {
+            chatMessage.receiverName = onlineUsernames[i];
+            stompClient.send('/app/introduce', {}, JSON.stringify(chatMessage));
+            console.log(chatMessage);
+        }
+        window.location.reload(); // çarpıya basınca sayfaya refresh atılır ve kullanıcı çıkartılır.
+    }
+
     const sendPrivateValue = () => {
         if (stompClient) {
             var chatMessage = {
                 senderName: userData.username,
                 receiverName: tab,
                 message: userData.message,
-                status: "MESSAGE"
+                status: "MESSAGE",
+                received: "No"
             };
-
+            console.log(chatMessage.senderName);
+            const index = onlineUsernames.indexOf(chatMessage.receiverName);
+            if (index > -1) {
+                chatMessage.received = "Yes";
+            }
+            console.log(chatMessage);
             if (userData.username !== tab) {
                 privateChats.get(tab).push(chatMessage);
                 setPrivateChats(new Map(privateChats));
@@ -163,13 +206,17 @@ const ChatRoom = () => {
     }
 
     const registerUser = () => {
-        
+
         connect();
     }
     return (
         <div className="container">
             {userData.connected ?
                 <div className="chat-box">
+                    <div className="buttons">
+                        <button type="button" className="exit-button" onClick={exit}>x</button>
+                        <button type="button" className="create-group" onClick={exit}>+</button>
+                    </div>
                     <div className="member-list">
                         <ul>
                             <li onClick={() => { setTab("CHATROOM") }} className={`member ${tab === "CHATROOM" && "active"}`}>Chatroom</li>
@@ -214,7 +261,7 @@ const ChatRoom = () => {
                 :
                 <div className="register">
                     <form>
-                        
+
                         <div className="registerInput">
                             <input
                                 type="text"
