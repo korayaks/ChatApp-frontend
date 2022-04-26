@@ -49,8 +49,11 @@ const ChatRoom = () => {
     }
     const onIntroduce = (payload) => {
         var payloadData = JSON.parse(payload.body);
-        onlineUsernames = payloadData.message;
-        console.log("LAST " + onlineUsernames);
+        if(payloadData.senderName !== userData.username){
+            onlineUsernames = payloadData.message;
+            console.log("LAST " + onlineUsernames);
+        }
+        
 
 
     }
@@ -168,6 +171,7 @@ const ChatRoom = () => {
             stompClient.send('/app/introduce', {}, JSON.stringify(chatMessage));
             console.log(chatMessage);
         }
+        stompClient.disconnect();
         window.location.reload(); // çarpıya basınca sayfaya refresh atılır ve kullanıcı çıkartılır.
     }
 
