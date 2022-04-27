@@ -25,7 +25,6 @@ button{
   font-weight: bold;
 }
 
-
 .container{
   position: relative;
 }
@@ -51,6 +50,8 @@ button{
 }
 
 .member-list{
+  overflow-y: auto;
+  height: 100%;
   width: 20%;
 }
 
@@ -60,6 +61,7 @@ button{
 }
 
 .chat-messages{
+  overflow-y: auto;
   height: 80%;
   border: 1px solid #000;
 }
@@ -133,6 +135,10 @@ ul {
   background-color: greenyellow;
 }
 .message{
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  height: auto;
   padding:5px;
   width: auto;
   display: flex;

@@ -3,7 +3,6 @@ import { over } from 'stompjs';
 import SockJS from 'sockjs-client';
 
 var stompClient = null;
-var forRegisterOrLogin;
 var usernames;
 var onlineUsernames = [];
 const ChatRoom = () => {
@@ -35,44 +34,32 @@ const ChatRoom = () => {
         stompClient.subscribe('/user/' + userData.username + '/client/registerOrLogin', onRegisterOrLogin);
         stompClient.subscribe('/user/' + userData.username + '/client/userList', onUserList);
         stompClient.subscribe('/user/' + userData.username + '/client/introduce', onIntroduce);
-        stompClient.send('/app/userList', {}, JSON.stringify(user));
         stompClient.send('/app/registerOrLogin', {}, JSON.stringify(user));
-        console.log("forregister onconnect içi = " + forRegisterOrLogin);
+        stompClient.send('/app/userList', {}, JSON.stringify(user));
     }
     const userJoin = () => {
         var chatMessage = {
             senderName: userData.username,
             status: "JOIN"
         };
-
         stompClient.send("/app/message", {}, JSON.stringify(chatMessage));
     }
     const onIntroduce = (payload) => {
         var payloadData = JSON.parse(payload.body);
-        if(payloadData.senderName !== userData.username){
+        if (payloadData.senderName !== userData.username) {
             onlineUsernames = payloadData.message;
             console.log("LAST " + onlineUsernames);
         }
-        
-
-
     }
     const onRegisterOrLogin = (payload) => {
         var payloadData = JSON.parse(payload.body);
         if (payloadData.message === "true") {
-            forRegisterOrLogin = true
-            console.log("forregister = " + forRegisterOrLogin);
-        } else {
-            forRegisterOrLogin = false;
-        }
-
-        if (forRegisterOrLogin) {
             setUserData({ ...userData, "connected": true });
             stompClient.subscribe('/chatroom/public', onMessageReceived);
             stompClient.subscribe('/user/' + userData.username + '/private', onPrivateMessage);
             userJoin();
         } else {
-            console.log("olmadı")
+            alert("Kullanıcı adı veya şifre yanlış.");
         }
     }
 
@@ -89,7 +76,6 @@ const ChatRoom = () => {
         });
         console.log(usernames);
         console.log("setted");
-
     }
 
     const onMessageReceived = (payload) => {
@@ -102,8 +88,10 @@ const ChatRoom = () => {
         console.log("receiver name = " + payloadData.senderName);
         switch (payloadData.status) {
             case "JOIN":
-                onlineUsernames.push(payloadData.senderName);
-                console.log("ASDASDSDASD " + onlineUsernames);
+                if (onlineUsernames.indexOf(payloadData.senderName) <= -1) {
+                    onlineUsernames.push(payloadData.senderName);
+                    console.log("ASDASDSDASD " + onlineUsernames);
+                }
                 stompClient.send('/app/introduce', {}, JSON.stringify(chatMessage));
                 if (!privateChats.get(payloadData.senderName)) {
                     privateChats.set(payloadData.senderName, []);
@@ -113,6 +101,8 @@ const ChatRoom = () => {
             case "MESSAGE":
                 publicChats.push(payloadData);
                 setPublicChats([...publicChats]);
+                break;
+            default:
                 break;
         }
     }
@@ -141,16 +131,21 @@ const ChatRoom = () => {
         setUserData({ ...userData, "message": value });
     }
     const sendValue = () => {
-        if (stompClient) {
-            var chatMessage = {
-                senderName: userData.username,
-                message: userData.message,
-                status: "MESSAGE"
-            };
-            console.log(chatMessage);
-            stompClient.send("/app/message", {}, JSON.stringify(chatMessage));
-            setUserData({ ...userData, "message": "" });
+        if (userData.message !== "" && userData.message.length < 255) {
+            if (stompClient) {
+                var chatMessage = {
+                    senderName: userData.username,
+                    message: userData.message,
+                    status: "MESSAGE"
+                };
+                console.log(chatMessage);
+                stompClient.send("/app/message", {}, JSON.stringify(chatMessage));
+                setUserData({ ...userData, "message": "" });
+            }
+        }else{
+            alert("En az 1 en çok 255 karakterlik bir mesaj yollayabilirsin.")
         }
+
     }
 
     const exit = () => {
@@ -176,29 +171,32 @@ const ChatRoom = () => {
     }
 
     const sendPrivateValue = () => {
-        if (stompClient) {
-            var chatMessage = {
-                senderName: userData.username,
-                receiverName: tab,
-                message: userData.message,
-                status: "MESSAGE",
-                received: "No"
-            };
-            console.log(chatMessage.senderName);
-            const index = onlineUsernames.indexOf(chatMessage.receiverName);
-            if (index > -1) {
-                chatMessage.received = "Yes";
+        if (userData.message !== "" && userData.message.length < 255) {
+            if (stompClient) {
+                var chatMessage = {
+                    senderName: userData.username,
+                    receiverName: tab,
+                    message: userData.message,
+                    status: "MESSAGE",
+                    received: "No"
+                };
+                console.log(chatMessage.senderName);
+                const index = onlineUsernames.indexOf(chatMessage.receiverName);
+                if (index > -1) {
+                    chatMessage.received = "Yes";
+                }
+                console.log(chatMessage);
+                if (userData.username !== tab) {
+                    privateChats.get(tab).push(chatMessage);
+                    setPrivateChats(new Map(privateChats));
+                }
+                stompClient.send("/app/private-message", {}, JSON.stringify(chatMessage));
+                setUserData({ ...userData, "message": "" });
             }
-            console.log(chatMessage);
-            if (userData.username !== tab) {
-                privateChats.get(tab).push(chatMessage);
-                setPrivateChats(new Map(privateChats));
-            }
-            stompClient.send("/app/private-message", {}, JSON.stringify(chatMessage));
-            setUserData({ ...userData, "message": "" });
+        }else{
+            alert("En az 1 en çok 255 karakterlik bir mesaj yollayabilirsin.")
         }
     }
-
     const handleUsername = (event) => {
         const { value } = event.target;
         setUserData({ ...userData, "username": value });
@@ -229,6 +227,7 @@ const ChatRoom = () => {
                             ))}
                         </ul>
                     </div>
+
                     {tab === "CHATROOM" && <div className="chat-content">
                         <ul className="chat-messages">
                             {publicChats.map((chat, index) => (
@@ -242,7 +241,7 @@ const ChatRoom = () => {
 
                         <div className="send-message">
                             <input type="text" className="input-message" placeholder="enter the message" value={userData.message} onChange={handleMessage} />
-                            <button type="button" className="send-button" onClick={sendValue}>send</button>
+                            <button type="button" className="send-button" onClick={sendValue}>Send</button>
                         </div>
                     </div>}
                     {tab !== "CHATROOM" && <div className="chat-content">
@@ -258,7 +257,7 @@ const ChatRoom = () => {
 
                         <div className="send-message">
                             <input type="text" className="input-message" placeholder="enter the message" value={userData.message} onChange={handleMessage} />
-                            <button type="button" className="send-button" onClick={sendPrivateValue}>send</button>
+                            <button type="button" className="send-button" onClick={sendPrivateValue}>Send</button>
                         </div>
                     </div>}
                 </div>
