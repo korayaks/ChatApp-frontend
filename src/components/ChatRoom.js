@@ -5,8 +5,10 @@ import SockJS from 'sockjs-client';
 var stompClient = null;
 var usernames;
 var onlineUsernames = [];
+var groupChatName = "";
 const ChatRoom = () => {
     const [privateChats, setPrivateChats] = useState(new Map());
+    const [groupChats, setGroupChats] = useState(new Map());
     const [publicChats, setPublicChats] = useState([]);
     const [tab, setTab] = useState("CHATROOM");
     const [userData, setUserData] = useState({
@@ -31,6 +33,7 @@ const ChatRoom = () => {
             username: userData.username,
             password: userData.password
         };
+
         stompClient.subscribe('/user/' + userData.username + '/client/registerOrLogin', onRegisterOrLogin);
         stompClient.subscribe('/user/' + userData.username + '/client/userList', onUserList);
         stompClient.subscribe('/user/' + userData.username + '/client/introduce', onIntroduce);
@@ -142,7 +145,7 @@ const ChatRoom = () => {
                 stompClient.send("/app/message", {}, JSON.stringify(chatMessage));
                 setUserData({ ...userData, "message": "" });
             }
-        }else{
+        } else {
             alert("En az 1 en çok 255 karakterlik bir mesaj yollayabilirsin.")
         }
 
@@ -193,7 +196,7 @@ const ChatRoom = () => {
                 stompClient.send("/app/private-message", {}, JSON.stringify(chatMessage));
                 setUserData({ ...userData, "message": "" });
             }
-        }else{
+        } else {
             alert("En az 1 en çok 255 karakterlik bir mesaj yollayabilirsin.")
         }
     }
@@ -211,6 +214,22 @@ const ChatRoom = () => {
 
         connect();
     }
+
+    const addUserToGroup = (name, index) => {
+        let element = document.getElementById(name);
+        element.setAttribute("hidden", "hidden");
+        groupChats.set(name, index);
+        setGroupChats(new Map(groupChats));
+        console.log("KAYIT: " +groupChats);
+    }
+    const removeUserFromGroup = (name, index) => {
+        let element = document.getElementById(name);
+        element.removeAttribute("hidden");
+        groupChats.delete(name, index);
+        setGroupChats(new Map(groupChats));
+        console.log("SİLME: " +groupChats);
+    }
+
     return (
         <div className="container">
             {userData.connected ?
@@ -225,6 +244,7 @@ const ChatRoom = () => {
                             {[...privateChats.keys()].map((name, index) => (
                                 <li onClick={() => { setTab(name) }} className={`member ${tab === name && "active"}`} key={index}>{name}</li>
                             ))}
+                            <li onClick={() => { setTab(groupChatName) }} className={`member ${tab === groupChatName && "active"}`}>{userData.username}'s Room</li>
                         </ul>
                     </div>
 
@@ -244,7 +264,39 @@ const ChatRoom = () => {
                             <button type="button" className="send-button" onClick={sendValue}>Send</button>
                         </div>
                     </div>}
-                    {tab !== "CHATROOM" && <div className="chat-content">
+
+                    {tab === groupChatName && <div className="chat-content">
+
+
+                        <ul className="chat-messages">
+                            {publicChats.map((chat, index) => (
+                                <li className={`message ${chat.senderName === userData.username && "self"}`} key={index}>
+                                    {chat.senderName !== userData.username && <div className="avatar">{chat.senderName}</div>}
+                                    <div className="message-data">{chat.message}</div>
+                                    {chat.senderName === userData.username && <div className="avatar self">{chat.senderName}</div>}
+                                </li>
+                            ))}
+                        </ul>
+
+                        <div className="send-message">
+                            <input type="text" className="input-message" placeholder="enter the message" value={userData.message} onChange={handleMessage} />
+                            <button type="button" className="send-button" onClick={sendValue}>Send</button>
+                        </div>
+                        <div className="member-list">
+                            <ul>
+                                {[...privateChats.keys()].map((name, index) => (
+                                    <li id={name} onClick={() => { addUserToGroup(name, index) }} className={`member ${tab === name && "active"}`} key={index}>{"+ " + name}</li>
+                                ))}
+                            </ul>
+                            <ul>
+                                {[...groupChats.keys()].map((name, index) => (
+                                    <li id={"group" + name} onClick={() => { removeUserFromGroup(name, index) }} className={`member ${tab === name && "active"}`} key={index}>{"- " + name}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    </div>}
+
+                    {(tab !== "CHATROOM" && tab !== groupChatName) && <div className="chat-content">
                         <ul className="chat-messages">
                             {[...privateChats.get(tab)].map((chat, index) => (
                                 <li className={`message ${chat.senderName === userData.username && "self"}`} key={index}>
