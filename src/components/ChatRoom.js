@@ -5,11 +5,11 @@ import SockJS from 'sockjs-client';
 var stompClient = null;
 var usernames;
 var onlineUsernames = [];
-var groupChatName = "";
+var groupChatJoinStatus = false;
 const ChatRoom = () => {
     const [privateChats, setPrivateChats] = useState(new Map());
-    const [groupChats, setGroupChats] = useState(new Map());
     const [publicChats, setPublicChats] = useState([]);
+    const [groupChats, setGroupChats] = useState([]);
     const [tab, setTab] = useState("CHATROOM");
     const [userData, setUserData] = useState({
         username: '',
@@ -33,8 +33,8 @@ const ChatRoom = () => {
             username: userData.username,
             password: userData.password
         };
-
         stompClient.subscribe('/user/' + userData.username + '/client/registerOrLogin', onRegisterOrLogin);
+        stompClient.subscribe('/user/' + userData.username + '/client/addUserToGroupChat', onAddUserToGroupChat);
         stompClient.subscribe('/user/' + userData.username + '/client/userList', onUserList);
         stompClient.subscribe('/user/' + userData.username + '/client/introduce', onIntroduce);
         stompClient.send('/app/registerOrLogin', {}, JSON.stringify(user));
@@ -47,6 +47,11 @@ const ChatRoom = () => {
         };
         stompClient.send("/app/message", {}, JSON.stringify(chatMessage));
     }
+
+    const onAddUserToGroupChat = (payload) => {
+
+    }
+
     const onIntroduce = (payload) => {
         var payloadData = JSON.parse(payload.body);
         if (payloadData.senderName !== userData.username) {
@@ -59,6 +64,7 @@ const ChatRoom = () => {
         if (payloadData.message === "true") {
             setUserData({ ...userData, "connected": true });
             stompClient.subscribe('/chatroom/public', onMessageReceived);
+            stompClient.subscribe('/chatroom/group', onMessageReceived);
             stompClient.subscribe('/user/' + userData.username + '/private', onPrivateMessage);
             userJoin();
         } else {
@@ -88,7 +94,6 @@ const ChatRoom = () => {
             receiverName: payloadData.senderName,
             message: onlineUsernames,
         };
-        console.log("receiver name = " + payloadData.senderName);
         switch (payloadData.status) {
             case "JOIN":
                 if (onlineUsernames.indexOf(payloadData.senderName) <= -1) {
@@ -98,12 +103,19 @@ const ChatRoom = () => {
                 stompClient.send('/app/introduce', {}, JSON.stringify(chatMessage));
                 if (!privateChats.get(payloadData.senderName)) {
                     privateChats.set(payloadData.senderName, []);
+                    privateChats.delete(userData.username);
                     setPrivateChats(new Map(privateChats));
                 }
                 break;
             case "MESSAGE":
                 publicChats.push(payloadData);
                 setPublicChats([...publicChats]);
+                break;
+            case "GROUP_MESSAGE":
+                if(groupChatJoinStatus){
+                    groupChats.push(payloadData);
+                    setGroupChats([...groupChats]);
+                }
                 break;
             default:
                 break;
@@ -143,6 +155,23 @@ const ChatRoom = () => {
                 };
                 console.log(chatMessage);
                 stompClient.send("/app/message", {}, JSON.stringify(chatMessage));
+                setUserData({ ...userData, "message": "" });
+            }
+        } else {
+            alert("En az 1 en çok 255 karakterlik bir mesaj yollayabilirsin.")
+        }
+
+    }
+    const sendGroupValue = () => {
+        if (userData.message !== "" && userData.message.length < 255) {
+            if (stompClient) {
+                var chatMessage = {
+                    senderName: userData.username,
+                    message: userData.message,
+                    status: "GROUP_MESSAGE"
+                };
+                console.log(chatMessage);
+                stompClient.send("/app/groupMessage", {}, JSON.stringify(chatMessage));
                 setUserData({ ...userData, "message": "" });
             }
         } else {
@@ -215,28 +244,44 @@ const ChatRoom = () => {
         connect();
     }
 
-    const addUserToGroup = (name, index) => {
-        let element = document.getElementById(name);
-        element.setAttribute("hidden", "hidden");
-        groupChats.set(name, index);
-        setGroupChats(new Map(groupChats));
-        console.log("KAYIT: " +groupChats);
-    }
-    const removeUserFromGroup = (name, index) => {
-        let element = document.getElementById(name);
+    /*
+        <ul>
+                 {[...privateChats.keys()].map((name, index) => (
+                     <li id={name} onClick={() => { addUserToGroup(name, index) }} className="groupUsersButton" key={index}>{"+ " + name}</li>
+                ))}
+            </ul>
+               <ul>
+                 {[...groupChats.keys()].map((name, index) => (
+                  <li id={"group" + name} onClick={() => { removeUserFromGroup(name, index) }} className="groupUsersButton" key={index}>{"- " + name}</li>
+                 ))}
+            </ul>
+        
+        let joinButton = document.getElementById("join-group-button");
+        joinButton.setAttribute("hidden", "hidden");
+        let exitButton = document.getElementById("exit-group-button");
+        console.log(exitButton);
+        exitButton.removeAttribute();
+
+
+
+        remove => let element = document.getElementById(name);
         element.removeAttribute("hidden");
         groupChats.delete(name, index);
         setGroupChats(new Map(groupChats));
-        console.log("SİLME: " +groupChats);
+        console.log("SİLME: " + groupChats);
+        */
+    const addUserToGroup = (name, index) => {
+        groupChatJoinStatus = true;
     }
-
+    const removeUserFromGroup = (name, index) => {
+        groupChatJoinStatus = false;
+    }
     return (
         <div className="container">
             {userData.connected ?
                 <div className="chat-box">
                     <div className="buttons">
                         <button type="button" className="exit-button" onClick={exit}>x</button>
-                        <button type="button" className="create-group" onClick={exit}>+</button>
                     </div>
                     <div className="member-list">
                         <ul>
@@ -244,7 +289,7 @@ const ChatRoom = () => {
                             {[...privateChats.keys()].map((name, index) => (
                                 <li onClick={() => { setTab(name) }} className={`member ${tab === name && "active"}`} key={index}>{name}</li>
                             ))}
-                            <li onClick={() => { setTab(groupChatName) }} className={`member ${tab === groupChatName && "active"}`}>{userData.username}'s Room</li>
+                            <li onClick={() => { setTab("GROUP") }} className={`member ${tab === "GROUP" && "active"}`}>{userData.username}'s Room</li>
                         </ul>
                     </div>
 
@@ -265,11 +310,13 @@ const ChatRoom = () => {
                         </div>
                     </div>}
 
-                    {tab === groupChatName && <div className="chat-content">
-
-
+                    {tab === "GROUP" && <div className="chat-content">
+                    <div className="buttons">
+                            <button id={"join-group-button"} type="button" className="join-group-button" onClick={addUserToGroup}>Join Group</button>
+                            <button id={"exit-group-button"} type="button" className="exit-group-button" onClick={removeUserFromGroup} >Exit Group</button>
+                        </div>
                         <ul className="chat-messages">
-                            {publicChats.map((chat, index) => (
+                            {groupChats.map((chat, index) => (
                                 <li className={`message ${chat.senderName === userData.username && "self"}`} key={index}>
                                     {chat.senderName !== userData.username && <div className="avatar">{chat.senderName}</div>}
                                     <div className="message-data">{chat.message}</div>
@@ -280,23 +327,13 @@ const ChatRoom = () => {
 
                         <div className="send-message">
                             <input type="text" className="input-message" placeholder="enter the message" value={userData.message} onChange={handleMessage} />
-                            <button type="button" className="send-button" onClick={sendValue}>Send</button>
+                            <button type="button" className="send-button" onClick={sendGroupValue}>Send</button>
                         </div>
-                        <div className="member-list">
-                            <ul>
-                                {[...privateChats.keys()].map((name, index) => (
-                                    <li id={name} onClick={() => { addUserToGroup(name, index) }} className={`member ${tab === name && "active"}`} key={index}>{"+ " + name}</li>
-                                ))}
-                            </ul>
-                            <ul>
-                                {[...groupChats.keys()].map((name, index) => (
-                                    <li id={"group" + name} onClick={() => { removeUserFromGroup(name, index) }} className={`member ${tab === name && "active"}`} key={index}>{"- " + name}</li>
-                                ))}
-                            </ul>
-                        </div>
+                        
+
                     </div>}
 
-                    {(tab !== "CHATROOM" && tab !== groupChatName) && <div className="chat-content">
+                    {(tab !== "CHATROOM" && tab !== "GROUP") && <div className="chat-content">
                         <ul className="chat-messages">
                             {[...privateChats.get(tab)].map((chat, index) => (
                                 <li className={`message ${chat.senderName === userData.username && "self"}`} key={index}>
