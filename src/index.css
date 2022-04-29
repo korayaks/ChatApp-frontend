@@ -83,7 +83,7 @@ ul {
 }
 .buttons{
   margin-right: 20px;
-  display:block;
+  
 }
 .create-group{
   width:80%;
@@ -108,6 +108,7 @@ ul {
   cursor: pointer;
   background-color: red;
 }
+
 .send-button{
   width:10%;
   border-radius: 50px;

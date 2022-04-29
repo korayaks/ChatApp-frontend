@@ -11,6 +11,7 @@ const ChatRoom = () => {
     const [publicChats, setPublicChats] = useState([]);
     const [groupChats, setGroupChats] = useState([]);
     const [tab, setTab] = useState("CHATROOM");
+    const [visible, setVisible] = useState(false);
     const [userData, setUserData] = useState({
         username: '',
         password: '',
@@ -98,8 +99,16 @@ const ChatRoom = () => {
             case "JOIN":
                 if (onlineUsernames.indexOf(payloadData.senderName) <= -1) {
                     onlineUsernames.push(payloadData.senderName);
-                    console.log("ASDASDSDASD " + onlineUsernames);
                 }
+                if(payloadData.senderName === userData.username){
+                    if(payloadData.message === "true"){
+                        setVisible(true);
+                    }else{
+                        setVisible(false);
+                    }
+                }
+                    
+                
                 stompClient.send('/app/introduce', {}, JSON.stringify(chatMessage));
                 if (!privateChats.get(payloadData.senderName)) {
                     privateChats.set(payloadData.senderName, []);
@@ -240,8 +249,13 @@ const ChatRoom = () => {
     }
 
     const registerUser = () => {
-
-        connect();
+        if(userData.username.length > 15 ){
+            alert("Kullanıcı adı maksimum 15 karakter olabilir!");
+        }else if(userData.password.length > 15){
+            alert("Şifre maksimum 15 karakter olabilir!");
+        }else{
+            connect();
+        }
     }
 
     /*
@@ -272,9 +286,11 @@ const ChatRoom = () => {
         */
     const addUserToGroup = (name, index) => {
         groupChatJoinStatus = true;
+        setVisible(true);
     }
     const removeUserFromGroup = (name, index) => {
         groupChatJoinStatus = false;
+        setVisible(false);
     }
     return (
         <div className="container">
@@ -284,12 +300,13 @@ const ChatRoom = () => {
                         <button type="button" className="exit-button" onClick={exit}>x</button>
                     </div>
                     <div className="member-list">
+                        <h4>Merhaba {userData.username}</h4>
                         <ul>
-                            <li onClick={() => { setTab("CHATROOM") }} className={`member ${tab === "CHATROOM" && "active"}`}>Chatroom</li>
+                            <li onClick={() => { setTab("CHATROOM") }} className={`member ${tab === "CHATROOM" && "active"}`}>Herkese Açık Chat</li>
                             {[...privateChats.keys()].map((name, index) => (
                                 <li onClick={() => { setTab(name) }} className={`member ${tab === name && "active"}`} key={index}>{name}</li>
                             ))}
-                            <li onClick={() => { setTab("GROUP") }} className={`member ${tab === "GROUP" && "active"}`}>{userData.username}'s Room</li>
+                            <li onClick={() => { setTab("GROUP") }} className={`member ${tab === "GROUP" && "active"}`}>Grup Chat</li>
                         </ul>
                     </div>
 
@@ -305,15 +322,15 @@ const ChatRoom = () => {
                         </ul>
 
                         <div className="send-message">
-                            <input type="text" className="input-message" placeholder="enter the message" value={userData.message} onChange={handleMessage} />
-                            <button type="button" className="send-button" onClick={sendValue}>Send</button>
+                            <input type="text" className="input-message" placeholder="Mesajınızı giriniz." value={userData.message} onChange={handleMessage} />
+                            <button type="button" className="send-button" onClick={sendValue}>gönder</button>
                         </div>
                     </div>}
 
                     {tab === "GROUP" && <div className="chat-content">
                     <div className="buttons">
-                            <button id={"join-group-button"} type="button" className="join-group-button" onClick={addUserToGroup}>Join Group</button>
-                            <button id={"exit-group-button"} type="button" className="exit-group-button" onClick={removeUserFromGroup} >Exit Group</button>
+                            {!visible && <button id="join-group-button" type="button" className="join-group-button" onClick={addUserToGroup}>Gruba Katıl</button>}
+                            {visible && <button id="exit-group-button" type="button" className="exit-group-button" onClick={removeUserFromGroup} >Gruptan Ayrıl</button>}         
                         </div>
                         <ul className="chat-messages">
                             {groupChats.map((chat, index) => (
@@ -326,8 +343,9 @@ const ChatRoom = () => {
                         </ul>
 
                         <div className="send-message">
-                            <input type="text" className="input-message" placeholder="enter the message" value={userData.message} onChange={handleMessage} />
-                            <button type="button" className="send-button" onClick={sendGroupValue}>Send</button>
+                            {visible &&<input type="text" className="input-message" placeholder="Mesajınızı giriniz." value={userData.message} onChange={handleMessage} />}
+                            {visible && <button type="button" className="send-button" onClick={sendGroupValue}>gönder</button>}
+                            {!visible && <h3>Mesaj göndermek ve görüntülemek için gruba katılmanız gerekiyor!</h3>}
                         </div>
                         
 
@@ -345,8 +363,8 @@ const ChatRoom = () => {
                         </ul>
 
                         <div className="send-message">
-                            <input type="text" className="input-message" placeholder="enter the message" value={userData.message} onChange={handleMessage} />
-                            <button type="button" className="send-button" onClick={sendPrivateValue}>Send</button>
+                            <input type="text" className="input-message" placeholder="Mesajınızı giriniz." value={userData.message} onChange={handleMessage} />
+                            <button type="button" className="send-button" onClick={sendPrivateValue}>gönder</button>
                         </div>
                     </div>}
                 </div>
