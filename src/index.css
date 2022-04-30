@@ -30,6 +30,9 @@ button{
 }
 .registerInput{
   margin-bottom: 10px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 .register{
   position:fixed;
@@ -74,7 +77,6 @@ button{
 
 .input-message{
   width:90%;
-  border-radius: 50px;
 }
 
 ul {
@@ -85,19 +87,10 @@ ul {
   margin-right: 20px;
   
 }
-.create-group{
-  width:80%;
-  height: 8%;
-  background-color: green;
-  border-radius: 50px;
-
-  cursor: pointer;
-}
 .exit-button{
   width:40px;
   height: 6%;
   background-color: red;
-  border-radius: 50px;
   cursor: pointer;
   margin-bottom: 10px;
 }
@@ -111,9 +104,9 @@ ul {
 
 .send-button{
   width:10%;
-  border-radius: 50px;
   margin-left: 5px;
   cursor: pointer;
+  /*border-radius: 50px;*/
 }
 .groupUsersButton{
   padding: 10px;
@@ -132,7 +125,7 @@ ul {
   box-shadow: 0 8px 8px -4px lightblue;
 }
 .member.active{
-  background: blueviolet;
+  background: rgb(43, 70, 226);
   color:#fff;
 }
 .member:hover{

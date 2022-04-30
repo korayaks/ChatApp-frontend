@@ -5,7 +5,7 @@ import SockJS from 'sockjs-client';
 var stompClient = null;
 var usernames;
 var onlineUsernames = [];
-var groupChatJoinStatus = false;
+
 const ChatRoom = () => {
     const [privateChats, setPrivateChats] = useState(new Map());
     const [publicChats, setPublicChats] = useState([]);
@@ -100,15 +100,15 @@ const ChatRoom = () => {
                 if (onlineUsernames.indexOf(payloadData.senderName) <= -1) {
                     onlineUsernames.push(payloadData.senderName);
                 }
-                if(payloadData.senderName === userData.username){
-                    if(payloadData.message === "true"){
+                if (payloadData.senderName === userData.username) {
+                    if (payloadData.message === "true") {
                         setVisible(true);
-                    }else{
+                    } else {
                         setVisible(false);
                     }
                 }
-                    
-                
+
+
                 stompClient.send('/app/introduce', {}, JSON.stringify(chatMessage));
                 if (!privateChats.get(payloadData.senderName)) {
                     privateChats.set(payloadData.senderName, []);
@@ -121,7 +121,7 @@ const ChatRoom = () => {
                 setPublicChats([...publicChats]);
                 break;
             case "GROUP_MESSAGE":
-                if(groupChatJoinStatus){
+                if (!visible) {
                     groupChats.push(payloadData);
                     setGroupChats([...groupChats]);
                 }
@@ -249,48 +249,37 @@ const ChatRoom = () => {
     }
 
     const registerUser = () => {
-        if(userData.username.length > 15 ){
+        if (userData.username.length > 15) {
             alert("Kullanıcı adı maksimum 15 karakter olabilir!");
-        }else if(userData.password.length > 15){
+        }else if (userData.username.length < 3){
+            alert("Kullanıcı adı minimum 3 karakter olmalıdır!");
+        }
+        else if(userData.password.length < 5){
+            alert("Şifre minimum 6 karakter olmalıdır!");
+        } 
+        else if (userData.password.length > 15) {
             alert("Şifre maksimum 15 karakter olabilir!");
-        }else{
+        } else {
             connect();
         }
     }
-
-    /*
-        <ul>
-                 {[...privateChats.keys()].map((name, index) => (
-                     <li id={name} onClick={() => { addUserToGroup(name, index) }} className="groupUsersButton" key={index}>{"+ " + name}</li>
-                ))}
-            </ul>
-               <ul>
-                 {[...groupChats.keys()].map((name, index) => (
-                  <li id={"group" + name} onClick={() => { removeUserFromGroup(name, index) }} className="groupUsersButton" key={index}>{"- " + name}</li>
-                 ))}
-            </ul>
-        
-        let joinButton = document.getElementById("join-group-button");
-        joinButton.setAttribute("hidden", "hidden");
-        let exitButton = document.getElementById("exit-group-button");
-        console.log(exitButton);
-        exitButton.removeAttribute();
-
-
-
-        remove => let element = document.getElementById(name);
-        element.removeAttribute("hidden");
-        groupChats.delete(name, index);
-        setGroupChats(new Map(groupChats));
-        console.log("SİLME: " + groupChats);
-        */
     const addUserToGroup = (name, index) => {
-        groupChatJoinStatus = true;
+        var chatMessage = {
+            senderName: userData.username,
+            message: "true",
+            status: "INFO"
+        };
         setVisible(true);
+        stompClient.send("/app/groupMessage", {}, JSON.stringify(chatMessage));
     }
     const removeUserFromGroup = (name, index) => {
-        groupChatJoinStatus = false;
+        var chatMessage = {
+            senderName: userData.username,
+            message: "false",
+            status: "INFO"
+        };
         setVisible(false);
+        stompClient.send("/app/groupMessage", {}, JSON.stringify(chatMessage));
     }
     return (
         <div className="container">
@@ -323,14 +312,14 @@ const ChatRoom = () => {
 
                         <div className="send-message">
                             <input type="text" className="input-message" placeholder="Mesajınızı giriniz." value={userData.message} onChange={handleMessage} />
-                            <button type="button" className="send-button" onClick={sendValue}>gönder</button>
+                            <button type="button" className="send-button" onClick={sendValue}>Gönder</button>
                         </div>
                     </div>}
 
                     {tab === "GROUP" && <div className="chat-content">
-                    <div className="buttons">
+                        <div className="buttons">
                             {!visible && <button id="join-group-button" type="button" className="join-group-button" onClick={addUserToGroup}>Gruba Katıl</button>}
-                            {visible && <button id="exit-group-button" type="button" className="exit-group-button" onClick={removeUserFromGroup} >Gruptan Ayrıl</button>}         
+                            {visible && <button id="exit-group-button" type="button" className="exit-group-button" onClick={removeUserFromGroup} >Gruptan Ayrıl</button>}
                         </div>
                         <ul className="chat-messages">
                             {groupChats.map((chat, index) => (
@@ -343,11 +332,11 @@ const ChatRoom = () => {
                         </ul>
 
                         <div className="send-message">
-                            {visible &&<input type="text" className="input-message" placeholder="Mesajınızı giriniz." value={userData.message} onChange={handleMessage} />}
-                            {visible && <button type="button" className="send-button" onClick={sendGroupValue}>gönder</button>}
+                            {visible && <input type="text" className="input-message" placeholder="Mesajınızı giriniz." value={userData.message} onChange={handleMessage} />}
+                            {visible && <button type="button" className="send-button" onClick={sendGroupValue}>Gönder</button>}
                             {!visible && <h3>Mesaj göndermek ve görüntülemek için gruba katılmanız gerekiyor!</h3>}
                         </div>
-                        
+
 
                     </div>}
 
@@ -364,19 +353,19 @@ const ChatRoom = () => {
 
                         <div className="send-message">
                             <input type="text" className="input-message" placeholder="Mesajınızı giriniz." value={userData.message} onChange={handleMessage} />
-                            <button type="button" className="send-button" onClick={sendPrivateValue}>gönder</button>
+                            <button type="button" className="send-button" onClick={sendPrivateValue}>Gönder</button>
                         </div>
                     </div>}
                 </div>
                 :
                 <div className="register">
                     <form>
-
+                        <h4>Merhaba, giriş yaparak sohbete bağlanın.</h4>
                         <div className="registerInput">
                             <input
                                 type="text"
                                 id="user-name"
-                                placeholder="Enter your username"
+                                placeholder="Kullanıcı adı giriniz."
                                 name="userName"
                                 value={userData.username}
                                 onChange={handleUsername}
@@ -387,7 +376,7 @@ const ChatRoom = () => {
                             <input
                                 type="password"
                                 id="password"
-                                placeholder="Enter your password"
+                                placeholder="Şifre giriniz."
                                 name="password"
                                 value={userData.password}
                                 onChange={handlePassword}
@@ -395,8 +384,8 @@ const ChatRoom = () => {
                             />
                         </div>
                         <div className="registerInput">
-                            <button type="button" onClick={registerUser}>
-                                connect
+                            <button type="button" style={{}} onClick={registerUser}>
+                                Bağlan
                             </button>
                         </div>
                     </form>
