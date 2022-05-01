@@ -5,6 +5,7 @@ import SockJS from 'sockjs-client';
 var stompClient = null;
 var usernames;
 var onlineUsernames = [];
+var inGroupUsernames = [];
 
 const ChatRoom = () => {
     const [privateChats, setPrivateChats] = useState(new Map());
@@ -37,9 +38,11 @@ const ChatRoom = () => {
         stompClient.subscribe('/user/' + userData.username + '/client/registerOrLogin', onRegisterOrLogin);
         stompClient.subscribe('/user/' + userData.username + '/client/addUserToGroupChat', onAddUserToGroupChat);
         stompClient.subscribe('/user/' + userData.username + '/client/userList', onUserList);
+        stompClient.subscribe('/user/' + userData.username + '/client/usersInGroupList', onUsersInGroupList);
         stompClient.subscribe('/user/' + userData.username + '/client/introduce', onIntroduce);
         stompClient.send('/app/registerOrLogin', {}, JSON.stringify(user));
         stompClient.send('/app/userList', {}, JSON.stringify(user));
+        stompClient.send('/app/usersInGroupList', {}, JSON.stringify(user));
     }
     const userJoin = () => {
         var chatMessage = {
@@ -87,7 +90,13 @@ const ChatRoom = () => {
         console.log(usernames);
         console.log("setted");
     }
-
+    const onUsersInGroupList = (payload) => {
+        var payloadData = JSON.parse(payload.body);
+        inGroupUsernames = (payloadData).map(function (item) {
+            return item.username;//Grupta olan kullanıcıların listesi.
+        });
+        console.log("GRUPTAKİ LİSTESİ 11111: " + inGroupUsernames)
+    }
     const onMessageReceived = (payload) => {
         var payloadData = JSON.parse(payload.body);
         var chatMessage = {
@@ -124,8 +133,22 @@ const ChatRoom = () => {
                 break;
             case "GROUP_MESSAGE":
                 if (!visible) {
-                    groupChats.push(payloadData);
-                    setGroupChats([...groupChats]);
+                    if (payloadData.receiverName === userData.username) {
+                        groupChats.push(payloadData);
+                        setGroupChats([...groupChats]);
+                    }
+                }
+                break;
+            case "INFO":
+                if (payloadData.message === "true") {
+                    inGroupUsernames.push(payloadData.senderName);
+                    console.log(inGroupUsernames);
+                } else if (payloadData.message === "false") {
+                    const index = inGroupUsernames.indexOf(payloadData.senderName);
+                    if (index > -1) {
+                        inGroupUsernames.splice(index, 1);
+                    }
+                    console.log(inGroupUsernames);
                 }
                 break;
             default:
@@ -190,11 +213,23 @@ const ChatRoom = () => {
             if (stompClient) {
                 var chatMessage = {
                     senderName: userData.username,
+                    receiverName: "",
                     message: userData.message,
-                    status: "GROUP_MESSAGE"
+                    status: "GROUP_MESSAGE",
+                    received: "No"
                 };
-                console.log(chatMessage);
-                stompClient.send("/app/groupMessage", {}, JSON.stringify(chatMessage));
+
+                inGroupUsernames.forEach(user => {
+                    const index = onlineUsernames.indexOf(user);
+                    if (index > -1) {
+                        chatMessage.received = "Yes";
+                    } else {
+                        chatMessage.received = "No";
+                    }
+                    chatMessage.receiverName = user;
+                    stompClient.send("/app/groupMessage", {}, JSON.stringify(chatMessage));;
+                    console.log(chatMessage);
+                });
                 setUserData({ ...userData, "message": "" });
             }
         } else {
@@ -294,6 +329,7 @@ const ChatRoom = () => {
         };
         setVisible(false);
         stompClient.send("/app/groupMessage", {}, JSON.stringify(chatMessage));
+
     }
     return (
         <div className="container">
@@ -309,7 +345,7 @@ const ChatRoom = () => {
                             {[...privateChats.keys()].map((name, index) => (
                                 <li onClick={() => { setTab(name) }} className={`member ${tab === name && "active"}`} key={index}>{name}</li>
                             ))}
-                            <li onClick={() => { setTab("GROUP") }} className={`member ${tab === "GROUP" && "active"}`}>Grup Chat</li>
+                            <li onClick={() => { setTab("GROUP") }} className={`member ${tab === "GROUP" && "active"}`}>Grup Chat</li>                       
                         </ul>
                     </div>
 
