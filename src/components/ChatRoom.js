@@ -116,9 +116,11 @@ const ChatRoom = () => {
                     setPrivateChats(new Map(privateChats));
                 }
                 break;
-            case "MESSAGE":
-                publicChats.push(payloadData);
-                setPublicChats([...publicChats]);
+            case "PUBLIC_MESSAGE":
+                if (payloadData.receiverName === userData.username) {
+                    publicChats.push(payloadData);
+                    setPublicChats([...publicChats]);
+                }
                 break;
             case "GROUP_MESSAGE":
                 if (!visible) {
@@ -159,11 +161,23 @@ const ChatRoom = () => {
             if (stompClient) {
                 var chatMessage = {
                     senderName: userData.username,
+                    receiverName: "",
                     message: userData.message,
-                    status: "MESSAGE"
+                    status: "PUBLIC_MESSAGE",
+                    received: "No"
                 };
-                console.log(chatMessage);
-                stompClient.send("/app/message", {}, JSON.stringify(chatMessage));
+                usernames.forEach(user => {
+                    const index = onlineUsernames.indexOf(user);
+                    if (index > -1) {
+                        chatMessage.received = "Yes";
+                    } else {
+                        chatMessage.received = "No";
+                    }
+                    chatMessage.receiverName = user;
+                    stompClient.send("/app/message", {}, JSON.stringify(chatMessage));
+                    console.log(chatMessage);
+                });
+
                 setUserData({ ...userData, "message": "" });
             }
         } else {
@@ -218,7 +232,7 @@ const ChatRoom = () => {
                     senderName: userData.username,
                     receiverName: tab,
                     message: userData.message,
-                    status: "MESSAGE",
+                    status: "PRIVATE_MESSAGE",
                     received: "No"
                 };
                 console.log(chatMessage.senderName);
@@ -251,12 +265,12 @@ const ChatRoom = () => {
     const registerUser = () => {
         if (userData.username.length > 15) {
             alert("Kullanıcı adı maksimum 15 karakter olabilir!");
-        }else if (userData.username.length < 3){
+        } else if (userData.username.length < 3) {
             alert("Kullanıcı adı minimum 3 karakter olmalıdır!");
         }
-        else if(userData.password.length < 5){
+        else if (userData.password.length < 5) {
             alert("Şifre minimum 6 karakter olmalıdır!");
-        } 
+        }
         else if (userData.password.length > 15) {
             alert("Şifre maksimum 15 karakter olabilir!");
         } else {
