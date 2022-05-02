@@ -6,7 +6,6 @@ var stompClient = null;
 var usernames;
 var onlineUsernames = [];
 var inGroupUsernames = [];
-
 const ChatRoom = () => {
     const [privateChats, setPrivateChats] = useState(new Map());
     const [publicChats, setPublicChats] = useState([]);
@@ -17,26 +16,25 @@ const ChatRoom = () => {
         username: '',
         password: '',
         receivername: '',
-        connected: false,
+        connected: false,//connected false ise kullanıcı, giriş ekranını görüntüler true ise mesajlaşma ekranını. 
         message: '',
     });
     useEffect(() => {
         console.log(userData);
     }, [userData]);
 
-    const connect = () => {
-        let Sock = new SockJS('http://localhost:8080/ws');
+    const connect = () => {//kullanıcı giriş ekranında herhangi bir validation'a takılmadıysa yeni bir soket oluşturuyoruz.
+        let Sock = new SockJS('http://localhost:8080/ws');//Backend server uzantılı yeni bir SockJS nesnesi oluşturuyorum. 
         stompClient = over(Sock);
-        stompClient.connect({}, onConnected, onError);
+        stompClient.connect({}, onConnected, onError);//stompClient.connect metodu ile backende bağlanıyorum.
     }
 
     const onConnected = () => {
-        var user = {
+        var user = {//kullanıcının giriş yaptığında verdiği bilgiler.
             username: userData.username,
             password: userData.password
-        };
-        stompClient.subscribe('/user/' + userData.username + '/client/registerOrLogin', onRegisterOrLogin);
-        stompClient.subscribe('/user/' + userData.username + '/client/addUserToGroupChat', onAddUserToGroupChat);
+        };//kullanıcı ilk olarak registerOrLogin uzantısı ile backende giriş işlemi yapmak istediğini söyler.
+        stompClient.subscribe('/user/' + userData.username + '/client/registerOrLogin', onRegisterOrLogin);//backendden gelen mesaj onRegisterOrLogin() methodunda işlenir. Eğer gelen mesaj olumsuz ise kullanıcının tekrar giriş yapmayı denenmesi istenir. 
         stompClient.subscribe('/user/' + userData.username + '/client/userList', onUserList);
         stompClient.subscribe('/user/' + userData.username + '/client/usersInGroupList', onUsersInGroupList);
         stompClient.subscribe('/user/' + userData.username + '/client/introduce', onIntroduce);
@@ -44,111 +42,101 @@ const ChatRoom = () => {
         stompClient.send('/app/userList', {}, JSON.stringify(user));
         stompClient.send('/app/usersInGroupList', {}, JSON.stringify(user));
     }
+
     const userJoin = () => {
         var chatMessage = {
             senderName: userData.username,
             status: "JOIN"
-        };
+        };//userJoin() fonksiyonunda kullanıcı /app/message uzantısı ile kullanıcı bilgisi ile birlikte backende mesaj yollar ve geri dönüş olarak bir mesaj alır. 
         stompClient.send("/app/message", {}, JSON.stringify(chatMessage));
-    }
+    }//Gelen mesaj /chatroom/public uzantısına yollanacağından gelen mesajı onMessageReceived() fonksiyonunda işliyorum.
 
-    const onAddUserToGroupChat = (payload) => {
-
-    }
-
-    const onIntroduce = (payload) => {
+    const onIntroduce = (payload) => {// /client/introduce mesajı gönderdiğimizde gelen mesajı işlediğimiz fonksiyon
         var payloadData = JSON.parse(payload.body);
         if (payloadData.senderName !== userData.username) {
-            onlineUsernames = payloadData.message;
-            console.log("LAST " + onlineUsernames);
+            onlineUsernames = payloadData.message;//gelen mesajda onlineUsername dizisi bulunmakta. Gelen mesajdaki diziyi bizim dizimize atıyoruz.
+            console.log("Online Listesi => " + onlineUsernames);
         }
     }
-    const onRegisterOrLogin = (payload) => {
+
+    const onRegisterOrLogin = (payload) => {//kullanıcı giriş yapmaya çalıştığında backend tarafından gelen mesaj burada işlenir
         var payloadData = JSON.parse(payload.body);
-        if (payloadData.message === "true") {
-            setUserData({ ...userData, "connected": true });
-            stompClient.subscribe('/chatroom/public', onMessageReceived);
-            stompClient.subscribe('/chatroom/group', onMessageReceived);
-            stompClient.subscribe('/user/' + userData.username + '/private', onPrivateMessage);
-            userJoin();
+        if (payloadData.message === "true") {//Eğer gelen mesaj "true" ise kullanıcı bağlanabilir demektir yani mesajlaşma ekranını görüntüleyebilir. (Ya kayır olmuştur ya da giriş yapmıştır ikisi de true olarak döner backend tarafından)
+            setUserData({ ...userData, "connected": true });//Kullanıcı başarılı giriş yaptığından userData.connected bilgisini true yapıyorum ve kullanıcı bu sayede mesajlaşma ekranını görüntüleyebiliyor.
+            stompClient.subscribe('/chatroom/public', onMessageReceived);// /chatroom/public uzantılı mesajlar Herkese Açık Sohbete ait olmuş oluyor. onMessageReceived() fonksiyonu ile kullanıcıya iletiliyor.
+            stompClient.subscribe('/chatroom/group', onMessageReceived);// /chatroom/group uzantılı mesajlar Grup Sohbetine ait olmuş oluyor. onMessageReceived() fonksiyonu ile kullanıcıya iletiliyor.
+            stompClient.subscribe('/user/' + userData.username + '/private', onPrivateMessage);// /user/username/private uzantılı tüm mesajlar ise private sohbet olarak kullanıcıya iletilicek
+            userJoin(); //kullanıcının giriş işlemi başarılı olduğundan userJoin() fonksiyonu ile giriş yapıyoruz.
         } else {
-            alert("Kullanıcı adı veya şifre yanlış.");
+            alert("Kullanıcı adı veya şifre yanlış.");// eğer gelen mesaj "false" ise kullanıcıdan tekrar kullanıcı adı veya şifre girmesini istiyorum. 
         }
     }
 
-    const onUserList = (payload) => {
+    const onUserList = (payload) => {//Gönderdiğimiz /app/userList uzantılı mesaja cevap olarak gelen mesajı işlediğim fonksiyon
         var payloadData = JSON.parse(payload.body);
-        console.log(payload.body);
-        console.log(payloadData)
-        usernames = (payloadData).map(function (item) {
+        usernames = (payloadData).map(function (item) {//gelen mesajda kayıtlı tüm kullanıcıların bir listesi var (List<User> listesi). 
             if (item.username !== userData.username) {
-                privateChats.set(item.username, []);
-            }
-
+                privateChats.set(item.username, []);//Listedeki tüm kullanıcıların kullanıcı adlarını privateChats dizisine atıyorum.
+            }//Bu sayede kullanıcı mesajlaşma ekranında sol tarafta diğer kullanıcı isimlerini görebiliyor ve isimlere tıklayarak onlara mesaj gönderebiliyor.
             return item.username;
         });
-        console.log(usernames);
-        console.log("setted");
     }
+
     const onUsersInGroupList = (payload) => {
         var payloadData = JSON.parse(payload.body);
         inGroupUsernames = (payloadData).map(function (item) {
             return item.username;//Grupta olan kullanıcıların listesi.
         });
-        console.log("GRUPTAKİ LİSTESİ 11111: " + inGroupUsernames)
+        console.log("Gruptakiler Listesi => " + inGroupUsernames)
     }
-    const onMessageReceived = (payload) => {
+    const onMessageReceived = (payload) => {//Herkese Açık Sohbet ve Grup Sohbet odalarına gelen mesajlar burada işleniyor.
         var payloadData = JSON.parse(payload.body);
         var chatMessage = {
             senderName: userData.username,
             receiverName: payloadData.senderName,
             message: onlineUsernames,
         };
-        switch (payloadData.status) {
-            case "JOIN":
+        switch (payloadData.status) {//gelen mesajın status değerine bakarak bu mesajın giriş için mi Herkese Açık Sohbet için mi yoksa Grup Sohbeti için mi buna karar veriyorum.
+            case "JOIN"://eğer status JOIN ise kullanıcı başarılı bir giriş yapma isteğinde bulunmuş demektir. Kullanıcıya Mesajlaşma 
                 if (onlineUsernames.indexOf(payloadData.senderName) <= -1) {
-                    onlineUsernames.push(payloadData.senderName);
+                    onlineUsernames.push(payloadData.senderName);//JOIN olan kullanıcıyı, eğer halihazırda onlineUsernames dizisinde yoksa bu diziye ekliyorum. 
                 }
                 if (payloadData.senderName === userData.username) {
-                    if (payloadData.message === "true") {
-                        setVisible(true);
+                    if (payloadData.message === "true") {//eğer kullanıcı grupta ise mesaj kısmı "true" olacaktır ve bu sayede visible değerini true yaparak 
+                        setVisible(true);               //kullanıcının gruba mesaj gönderebilmesi ve mesajları okuyabilmesini sağlıyorum. 
                     } else {
                         setVisible(false);
                     }
-                }
-
-
-                stompClient.send('/app/introduce', {}, JSON.stringify(chatMessage));
-                if (!privateChats.get(payloadData.senderName)) {
+                }//introduce mesajının anlamı bağlı diğer kullanıcılara hali hazırda online olan username'leri göndermektir. Bu sayede yeni giriş yapan kullanıcı, hali hazırda online olan diğer tüm kullanıcıları bilecektir. 
+                stompClient.send('/app/introduce', {}, JSON.stringify(chatMessage));//Bu bilginin tutulması önemli çünkü kullanıcı mesaj attığında eğer mesaj attığı kullanıcı online değil ise, online olmayan kullanıcı giriş yaptığında mesajı okuması sağlanmaktadır. 
+                if (!privateChats.get(payloadData.senderName)) {//kullanıcı yeni giriş yapan diğer kullanıcılara private mesaj atabilmesi için privateChats dizisine kullanıcıyı atar.
                     privateChats.set(payloadData.senderName, []);
-                    privateChats.delete(userData.username);
+                    privateChats.delete(userData.username);//kullanıcının kendisi çıkartılır çünkü kullanıcının kendisine mesaj atmasını istemiyorum.
                     setPrivateChats(new Map(privateChats));
                 }
                 break;
-            case "PUBLIC_MESSAGE":
+            case "PUBLIC_MESSAGE"://PUBLIC_MESSAGE ise Herkese Açık Sohbet için gelen mesajları ele alır
                 if (payloadData.receiverName === userData.username) {
-                    publicChats.push(payloadData);
+                    publicChats.push(payloadData);//Eğer bu mesaj kullanıcıya geldiyse publicChats dizisine atar. Bu sayede kullanıcı mesajı okur.
                     setPublicChats([...publicChats]);
                 }
                 break;
-            case "GROUP_MESSAGE":
-                if (!visible) {
-                    if (payloadData.receiverName === userData.username) {
-                        groupChats.push(payloadData);
+            case "GROUP_MESSAGE"://GROUP_MESSAGE ise Grup Sohbet için gelen mesajları ele alır.
+                if (!visible) {//Eğer kullanıcı grupta ise ve 
+                    if (payloadData.receiverName === userData.username) {//Eğer mesaj kullanıcının kendisine gelmiş ise
+                        groupChats.push(payloadData); //kullanıcı mesajı görüntüleyebilir.
                         setGroupChats([...groupChats]);
                     }
                 }
                 break;
-            case "INFO":
-                if (payloadData.message === "true") {
-                    inGroupUsernames.push(payloadData.senderName);
-                    console.log(inGroupUsernames);
-                } else if (payloadData.message === "false") {
-                    const index = inGroupUsernames.indexOf(payloadData.senderName);
+            case "INFO"://INFO ise kullanıcıların grupta olup olmadığını belirlemek için kullanılıyor. 
+                if (payloadData.message === "true") {// eğer gelen mesaj içeriği "true" ise gönderen kullanıcıyı inGroupUsernames dizisine atıyorum.
+                    inGroupUsernames.push(payloadData.senderName);//Bunun anlamı grupta olan başka bir kullanıcı mesaj attığı zaman, mesaj bu kullanıcı da grupta olduğu için bu kullanıcıya da gelecektir. 
+                } else if (payloadData.message === "false") {//false ise grupta değildir anlamına geliyor
+                    const index = inGroupUsernames.indexOf(payloadData.senderName);//eğer hali hazırda kullanıcı inGroupUsernames dizisinde ise diziden çıkartıyorum.
                     if (index > -1) {
                         inGroupUsernames.splice(index, 1);
                     }
-                    console.log(inGroupUsernames);
                 }
                 break;
             default:
@@ -156,8 +144,7 @@ const ChatRoom = () => {
         }
     }
 
-    const onPrivateMessage = (payload) => {
-        console.log(payload);
+    const onPrivateMessage = (payload) => {//private mesaj geldiğinde bu fonksiyon çalışıyor. Bu fonksiyon sayesinde kullanıcı gelen private mesajı görüntüleyebiliyor.
         var payloadData = JSON.parse(payload.body);
         if (privateChats.get(payloadData.senderName)) {
             privateChats.get(payloadData.senderName).push(payloadData);
@@ -170,67 +157,63 @@ const ChatRoom = () => {
         }
     }
 
-    const onError = (err) => {
+    const onError = (err) => {//Error alındığında çalışıyor.
         console.log(err);
-
     }
 
     const handleMessage = (event) => {
         const { value } = event.target;
         setUserData({ ...userData, "message": value });
     }
-    const sendValue = () => {
-        if (userData.message !== "" && userData.message.length < 255) {
+    const sendValue = () => {//Kullanıcı Herkese Açık Sohbete mesaj göndermiş ise bu fonksiyon çalışıyor.
+        if (userData.message !== "" && userData.message.length < 255) {//gönderilecek mesaj kontrol edilir (boş olmamalı ve en fazla 255 karakter olmalı).
             if (stompClient) {
-                var chatMessage = {
+                var chatMessage = {//Bir mesaj oluşturuluyor ve status değerine PUBLIC_MESSAGE ve received yani iletildi alanına "No" atanıyor.
                     senderName: userData.username,
                     receiverName: "",
                     message: userData.message,
                     status: "PUBLIC_MESSAGE",
                     received: "No"
                 };
-                usernames.forEach(user => {
+                usernames.forEach(user => {//Bu mesaj herkese gönderileceğinden usernames dizisindeki tüm elemanlara bu mesaj gönderiliyor. usernames dizisinde kayıtlı tüm kullanıcı adları var.
                     const index = onlineUsernames.indexOf(user);
-                    if (index > -1) {
+                    if (index > -1) {//Eğer kullanıcı hali hazırda online ise received alanı "Yes" oluyor.
                         chatMessage.received = "Yes";
                     } else {
                         chatMessage.received = "No";
                     }
                     chatMessage.receiverName = user;
-                    stompClient.send("/app/message", {}, JSON.stringify(chatMessage));
-                    console.log(chatMessage);
+                    stompClient.send("/app/message", {}, JSON.stringify(chatMessage));//mesaj gönderiliyor.
                 });
-
-                setUserData({ ...userData, "message": "" });
+                setUserData({ ...userData, "message": "" });//mesaj textboxu boşaltılıyor.
             }
         } else {
             alert("En az 1 en çok 255 karakterlik bir mesaj yollayabilirsin.")
         }
 
     }
-    const sendGroupValue = () => {
-        if (userData.message !== "" && userData.message.length < 255) {
+    const sendGroupValue = () => {//Kullanıcı gruba mesaj gönderdiğinde  bu fonksiyon çalışıyor
+        if (userData.message !== "" && userData.message.length < 255) {//mesajın uzunluğu kontrol ediliyor (boş olmamalı ve en fazla 255 karakter olmalı).
             if (stompClient) {
-                var chatMessage = {
+                var chatMessage = {//Bir mesaj oluşturuluyor ve status değerine GROUP_MESSAGE ve received yani iletildi alanına "No" atanıyor.
                     senderName: userData.username,
                     receiverName: "",
                     message: userData.message,
                     status: "GROUP_MESSAGE",
-                    received: "No"
+                    received: "No"//"No" olmasının sebebi gönderilen kullanıcı offline ise giriş yaptığında sonradan okuyabiliyor.
                 };
 
-                inGroupUsernames.forEach(user => {
-                    const index = onlineUsernames.indexOf(user);
+                inGroupUsernames.forEach(user => { //gruptaki tüm kullanıcılara bu mesaj yollanıyor.
+                    const index = onlineUsernames.indexOf(user);//eğer kullanıcı hali hazırda online ise received yani iletildi alanı "Yes" yapılıyor
                     if (index > -1) {
                         chatMessage.received = "Yes";
                     } else {
                         chatMessage.received = "No";
                     }
                     chatMessage.receiverName = user;
-                    stompClient.send("/app/groupMessage", {}, JSON.stringify(chatMessage));;
-                    console.log(chatMessage);
+                    stompClient.send("/app/groupMessage", {}, JSON.stringify(chatMessage));//gruptaki tüm kullanıcılara aynı mesaj gönderiliyor.
                 });
-                setUserData({ ...userData, "message": "" });
+                setUserData({ ...userData, "message": "" });//mesaj texboxu boşaltılıyor.
             }
         } else {
             alert("En az 1 en çok 255 karakterlik bir mesaj yollayabilirsin.")
@@ -238,67 +221,63 @@ const ChatRoom = () => {
 
     }
 
-    const exit = () => {
+    const exit = () => {//kullanıcı sağ yukarıdaki x (çıkış) butonuna bastığında çalışır
         var chatMessage = {
             senderName: userData.username,
             receiverName: "",
             message: onlineUsernames,
         };
 
-        const index = onlineUsernames.indexOf(userData.username);
+        const index = onlineUsernames.indexOf(userData.username);//çıkış yapan kullanıcı onlineUsernames dizisinden çıkar.
         if (index > -1) {
             onlineUsernames.splice(index, 1);
         }
-        console.log("index dışı usernames = " + onlineUsernames);
         chatMessage.message = onlineUsernames;
-        for (var i = 0; i < onlineUsernames.length; i++) {
+        for (var i = 0; i < onlineUsernames.length; i++) {//ve çıkış işlemi diğer tüm online kullanıcılara yeni onlineUsernames dizisi gönderilir.
             chatMessage.receiverName = onlineUsernames[i];
-            stompClient.send('/app/introduce', {}, JSON.stringify(chatMessage));
-            console.log(chatMessage);
+            stompClient.send('/app/introduce', {}, JSON.stringify(chatMessage));//yani gönderilen mesaj sayesinde diğer online kullanıcılar güncel onlineUsernames dizisini alır.
         }
-        stompClient.disconnect();
-        window.location.reload(); // çarpıya basınca sayfaya refresh atılır ve kullanıcı çıkartılır.
+        stompClient.disconnect();//Socket disconnect edilir.
+        window.location.reload(); //Sayfaya refresh atılır ve kullanıcı, kullanıcı giriş sayfasına yönlendirilir. Giriş yaparsa soket tekrar açılır.
     }
 
-    const sendPrivateValue = () => {
-        if (userData.message !== "" && userData.message.length < 255) {
+    const sendPrivateValue = () => {//Kullanıcı private mesaj yani başka bir kullanıcıya mesaj attığında bu fonksiyon çalışır.
+        if (userData.message !== "" && userData.message.length < 255) {//gönderilecek mesaj kontrol edilir (boş olmamalı ve en fazla 255 karakter olmalı).
             if (stompClient) {
-                var chatMessage = {
+                var chatMessage = {//Bir mesaj oluşturuluyor ve status değerine PRIVATE_MESSAGE ve received yani iletildi alanına "No" atanıyor.
                     senderName: userData.username,
                     receiverName: tab,
                     message: userData.message,
                     status: "PRIVATE_MESSAGE",
                     received: "No"
                 };
-                console.log(chatMessage.senderName);
-                const index = onlineUsernames.indexOf(chatMessage.receiverName);
+                const index = onlineUsernames.indexOf(chatMessage.receiverName);//mesajı göndereceğimiz kullanıcı hali hazırda online ise received alanını "Yes" yapıyorum. 
                 if (index > -1) {
                     chatMessage.received = "Yes";
                 }
-                console.log(chatMessage);
                 if (userData.username !== tab) {
-                    privateChats.get(tab).push(chatMessage);
+                    privateChats.get(tab).push(chatMessage);//gönderilen mesajın görüntülenmesi sağlanılıyor.
                     setPrivateChats(new Map(privateChats));
                 }
-                stompClient.send("/app/private-message", {}, JSON.stringify(chatMessage));
-                setUserData({ ...userData, "message": "" });
+                stompClient.send("/app/private-message", {}, JSON.stringify(chatMessage));//mesaj gönderiliyor.
+                setUserData({ ...userData, "message": "" });//Mesaj textboxu temizleniyor.
             }
         } else {
             alert("En az 1 en çok 255 karakterlik bir mesaj yollayabilirsin.")
         }
     }
-    const handleUsername = (event) => {
+    const handleUsername = (event) => {//girişteki kullanıcı adı kısmını userData.username alanına atar.
         const { value } = event.target;
         setUserData({ ...userData, "username": value });
     }
 
-    const handlePassword = (event) => {
+    const handlePassword = (event) => {//girişteki şifre kısmını userData.password alanına atar.
         const { value } = event.target;
         setUserData({ ...userData, "password": value });
     }
 
-    const registerUser = () => {
-        if (userData.username.length > 15) {
+    const registerUser = () => {//kullanıcı "Bağlan" butonuna bastığında kullanıcı adı ve şifre alanlarını kontrol ediyoruz.
+        if (userData.username.length > 15) {//Eğer herhangi bir hata yoksa connect() methodunu çağırıyorum.
             alert("Kullanıcı adı maksimum 15 karakter olabilir!");
         } else if (userData.username.length < 3) {
             alert("Kullanıcı adı minimum 3 karakter olmalıdır!");
@@ -312,23 +291,23 @@ const ChatRoom = () => {
             connect();
         }
     }
-    const addUserToGroup = (name, index) => {
+    const addUserToGroup = (name, index) => {//kullanıcı gruba girdiğinde backende status alanı "INFO" olan ve mesaj alanı "true" olan bir mesaj yollar
         var chatMessage = {
             senderName: userData.username,
             message: "true",
             status: "INFO"
         };
-        setVisible(true);
-        stompClient.send("/app/groupMessage", {}, JSON.stringify(chatMessage));
+        setVisible(true);//visible değerini true yapar bu sayede kullanıcı mesaj yazıp gönder tuşuna basabilir
+        stompClient.send("/app/groupMessage", {}, JSON.stringify(chatMessage));//yollanılan bu mesaj client'a geldiğinde onMessageReceived() fonksiyonunda işlenir.
     }
-    const removeUserFromGroup = (name, index) => {
+    const removeUserFromGroup = (name, index) => {//kullanıcı gruptan çıktığında backende status alanı "INFO" olan ve mesaj alanı "false" olan bir mesaj yollanır
         var chatMessage = {
             senderName: userData.username,
             message: "false",
             status: "INFO"
         };
-        setVisible(false);
-        stompClient.send("/app/groupMessage", {}, JSON.stringify(chatMessage));
+        setVisible(false);//visible değerini false yapar bu sayede kullanıcı mesaj yazma alanını ve butonu görüntüleyemez.
+        stompClient.send("/app/groupMessage", {}, JSON.stringify(chatMessage));//yollanılan bu mesaj client'a geldiğinde onMessageReceived() fonksiyonunda işlenir.
 
     }
     return (
@@ -341,11 +320,11 @@ const ChatRoom = () => {
                     <div className="member-list">
                         <h4>Merhaba {userData.username}</h4>
                         <ul>
-                            <li onClick={() => { setTab("CHATROOM") }} className={`member ${tab === "CHATROOM" && "active"}`}>Herkese Açık Chat</li>
+                            <li onClick={() => { setTab("CHATROOM") }} className={`member ${tab === "CHATROOM" && "active"}`}>Herkese Açık Sohbet</li>
                             {[...privateChats.keys()].map((name, index) => (
                                 <li onClick={() => { setTab(name) }} className={`member ${tab === name && "active"}`} key={index}>{name}</li>
                             ))}
-                            <li onClick={() => { setTab("GROUP") }} className={`member ${tab === "GROUP" && "active"}`}>Grup Chat</li>                       
+                            <li onClick={() => { setTab("GROUP") }} className={`member ${tab === "GROUP" && "active"}`}>Grup Sohbet</li>
                         </ul>
                     </div>
 
